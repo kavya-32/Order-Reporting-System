@@ -38,7 +38,7 @@ with col2:
 period_labels = {"30_min": "last 30 minutes", "1_hour": "last 1 hour", "1_day": "last 1 day"}
 st.info(f"📅 Ready to fetch orders from {period_labels[st.session_state.time_period]}")
 
-if st.button("🚀 Generate Report", type="primary", use_container_width=True):
+if st.button("🚀 Generate Report", type="primary"):
     with st.spinner("Fetching data from platforms..."):
         try:
             path = extract_transform_load(
@@ -76,8 +76,7 @@ if st.button("🚀 Generate Report", type="primary", use_container_width=True):
                 label="📥 Download Excel Report",
                 data=file_data,
                 file_name=filename,
-                mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-                use_container_width=True
+                mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
             )
 
         except Exception as e:
