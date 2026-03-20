@@ -19,7 +19,6 @@ from urllib3.util.retry import Retry
 logging.basicConfig(level=logging.INFO, format="%(levelname)s | %(message)s")
 LOGGER = logging.getLogger(__name__)
 
-DEFAULT_LIMIT = 10  # Number of orders to fetch per platform
 TIMEOUT = (5, 20)
 FINAL_COLUMNS = [
     "Platform",
@@ -60,62 +59,172 @@ def fetch_amazon_orders(time_period: str = "1_hour") -> list[dict]:
         region = os.getenv("AWS_REGION", "us-east-1")
         
         if not access_key or not secret_key:
-            LOGGER.warning("AWS credentials not found. Using mock data for Amazon.")
-            return generate_amazon_orders_mock(10)
+            LOGGER.warning("AWS credentials not found.")
+            return []
         
-        # This is a placeholder for real Amazon SP-API integration
-        # In production, use boto3 and amazon-selling-partner-api
-        session = build_session()
+        # Real Amazon Selling Partner API integration
+        # Requires: pip install amazon-selling-partner-api or boto3-stubs
+        import boto3
+        from botocore.auth import SigV4Auth
+        from botocore.awsrequest import AWSRequest
+        
+        session = boto3.Session(
+            aws_access_key_id=access_key,
+            aws_secret_access_key=secret_key,
+            region_name=region
+        )
+        client = session.client('orders', api_version='v0')
         start_time, end_time = get_time_range(time_period)
         
-        # Real API call would go here
-        # For now, return mock data
-        return generate_amazon_orders_mock(10)
+        # Fetch orders from API
+        response = client.get_orders(
+            CreatedAfter=start_time.isoformat(),
+            CreatedBefore=end_time.isoformat(),
+            OrderStatuses=['Pending', 'Unshipped', 'PartiallyShipped', 'Shipped'],
+            MaxResultsPerPage=100
+        )
+        
+        orders = []
+        for order in response.get('Orders', []):
+            order_id = order.get('AmazonOrderId', '')
+            purchase_date = order.get('PurchaseDate', '')
+            
+            # Get order items for book details
+            items_response = client.get_order_items(AmazonOrderId=order_id)
+            for item in items_response.get('OrderItems', []):
+                orders.append({
+                    "order_id": order_id,
+                    "title": item.get('ProductName', 'Unknown'),
+                    "author": "Amazon",
+                    "isbn": item.get('ASIN', ''),
+                    "price": float(item.get('ItemPrice', {}).get('Amount', 0)),
+                    "quantity": int(item.get('Quantity', 1)),
+                    "order_date": purchase_date,
+                    "region": "US",
+                })
+        
+        LOGGER.info("Fetched %d orders from Amazon API", len(orders))
+        return orders
+        
+    except ImportError:
+        LOGGER.error("boto3 not installed. Install with: pip install boto3")
+        return []
     except Exception as e:
-        LOGGER.error("Error fetching Amazon orders: %s. Using mock data.", str(e))
-        return generate_amazon_orders_mock(10)
+        LOGGER.error("Error fetching Amazon orders via API: %s", str(e))
+        return []
 
 
 def fetch_flipkart_orders(time_period: str = "1_hour") -> list[dict]:
-    """Fetch real Flipkart API data"""
+    """Fetch real Flipkart Seller API data"""
     try:
         client_id = os.getenv("FLIPKART_CLIENT_ID")
         client_secret = os.getenv("FLIPKART_CLIENT_SECRET")
         
         if not client_id or not client_secret:
-            LOGGER.warning("Flipkart credentials not found. Using mock data.")
-            return generate_flipkart_orders_mock(10)
+            LOGGER.warning("Flipkart credentials not found.")
+            return []
         
+        # Real Flipkart Seller API integration
+        # Endpoint: https://api.flipkart.net/sellers/v1/
         session = build_session()
         start_time, end_time = get_time_range(time_period)
         
-        # Real Flipkart API call would go here
-        # For now, return mock data
-        return generate_flipkart_orders_mock(10)
+        headers = {
+            "X-FK-APP-ID": client_id,
+            "X-FK-APP-TOKEN": client_secret,
+            "Content-Type": "application/json"
+        }
+        
+        # Fetch orders from Flipkart API
+        url = "https://api.flipkart.net/sellers/v1/orders"
+        params = {
+            "statuses": ["OMS_CONFIRMED", "OMS_SHIPPED", "OMS_DELIVERED"],
+            "startDate": start_time.strftime("%Y-%m-%d"),
+            "endDate": end_time.strftime("%Y-%m-%d")
+        }
+        
+        response = session.get(url, headers=headers, params=params, timeout=TIMEOUT)
+        response.raise_for_status()
+        data = response.json()
+        
+        orders = []
+        for order in data.get('orders', []):
+            for item in order.get('items', []):
+                orders.append({
+                    "order_id": order.get('orderId', ''),
+                    "title": item.get('productName', 'Unknown'),
+                    "author": "Flipkart",
+                    "isbn": item.get('productSku', ''),
+                    "price": float(item.get('price', 0)),
+                    "quantity": int(item.get('quantity', 1)),
+                    "order_date": order.get('orderCreateDate', ''),
+                    "region": "IN",
+                })
+        
+        LOGGER.info("Fetched %d orders from Flipkart API", len(orders))
+        return orders
+        
     except Exception as e:
-        LOGGER.error("Error fetching Flipkart orders: %s. Using mock data.", str(e))
-        return generate_flipkart_orders_mock(10)
+        LOGGER.error("Error fetching Flipkart orders via API: %s", str(e))
+        return []
 
 
 def fetch_meta_ads_orders(time_period: str = "1_hour") -> list[dict]:
-    """Fetch real Meta Ads API data (conversions/purchases from ads)"""
+    """Fetch real Meta Conversions API data (purchases from ads)"""
     try:
         access_token = os.getenv("META_ACCESS_TOKEN")
         ad_account_id = os.getenv("META_AD_ACCOUNT_ID")
         
         if not access_token or not ad_account_id:
-            LOGGER.warning("Meta credentials not found. Using mock data.")
-            return generate_meta_ads_orders_mock(10)
+            LOGGER.warning("Meta credentials not found.")
+            return []
         
+        # Real Meta Conversions API integration
+        # Endpoint: https://graph.instagram.com/v19.0/
         session = build_session()
         start_time, end_time = get_time_range(time_period)
         
-        # Real Meta Conversions API call would go here
-        # For now, return mock data
-        return generate_meta_ads_orders_mock(10)
+        headers = {
+            "Authorization": f"Bearer {access_token}",
+            "Content-Type": "application/json"
+        }
+        
+        # Fetch conversion events (purchases) from Meta API
+        url = f"https://graph.instagram.com/v19.0/{ad_account_id}/conversions"
+        params = {
+            "fields": "id,event_name,event_source_url,event_time,custom_data",
+            "access_token": access_token,
+            "date_start": start_time.strftime("%Y-%m-%d"),
+            "date_stop": end_time.strftime("%Y-%m-%d")
+        }
+        
+        response = session.get(url, headers=headers, params=params, timeout=TIMEOUT)
+        response.raise_for_status()
+        data = response.json()
+        
+        orders = []
+        for event in data.get('conversions', []):
+            if event.get('event_name') == 'Purchase':
+                custom_data = event.get('custom_data', {})
+                orders.append({
+                    "order_id": f"META-{event.get('id', '')}",
+                    "title": custom_data.get('content_name', 'Book'),
+                    "author": "Meta Ads",
+                    "isbn": custom_data.get('content_ids', [''])[0],
+                    "price": float(custom_data.get('value', 0)),
+                    "quantity": int(custom_data.get('content_quantity', 1)),
+                    "order_date": datetime.fromtimestamp(
+                        int(event.get('event_time', 0)), tz=timezone.utc
+                    ).isoformat(),
+                    "region": custom_data.get('state', 'Unknown'),
+                })
+        
+        LOGGER.info("Fetched %d purchase events from Meta API", len(orders))
+        return orders
+        
     except Exception as e:
-        LOGGER.error("Error fetching Meta orders: %s. Using mock data.", str(e))
-        return generate_meta_ads_orders_mock(10)
+        LOGGER.error("Error fetching Meta orders via API: %s", str(e))
+        return []
 
 
 # Mock data generators for demonstration
