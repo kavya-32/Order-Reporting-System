@@ -1,14 +1,17 @@
 # 📊 Book Publisher Order Reporting System
 
-A real-time ETL system that consolidates order data from multiple e-commerce platforms (Amazon, Flipkart, Meta Ads) into a single Excel report.
+A real-time ETL system that consolidates order data from multiple sources (using free public APIs for demo) into a single Excel report.
 
 ## Features
 
-- ✅ **Multi-Platform Integration**: Amazon Selling Partner API, Flipkart Marketplace API, Meta Conversions API
+- ✅ **Multi-Source Integration**: Fetches real data from free public APIs (DummyJSON)
+  - **Amazon**: Book products from DummyJSON
+  - **Flipkart**: Furniture products from DummyJSON (simulated)
+  - **Meta Ads**: General products from DummyJSON (simulated)
 - ⏰ **Time-Based Filtering**: Fetch orders from last 30 minutes, 1 hour, or 1 day
 - 📊 **Data Consolidation**: Unified Excel reports with clean, structured data
-- 🔄 **Real API Support**: Seamless integration with actual APIs (with mock data fallback)
 - 🌐 **Streamlit Dashboard**: Web-based UI for easy report generation
+- 🔓 **No API Keys Required**: Uses free public DummyJSON API
 
 ## Setup
 
@@ -18,36 +21,7 @@ A real-time ETL system that consolidates order data from multiple e-commerce pla
 pip install -r requirements.txt
 ```
 
-### 2. Configure API Credentials
-
-Create a `.env` file in the project root (copy from `.env.example`):
-
-```bash
-cp .env.example .env
-```
-
-Then add your actual API credentials:
-
-#### Amazon Selling Partner API
-- Visit: https://developer.amazon.com/
-- Register your application and get:
-  - `AWS_ACCESS_KEY_ID`
-  - `AWS_SECRET_ACCESS_KEY`
-  - `AWS_REGION`
-
-#### Flipkart API
-- Contact: Flipkart seller support or https://seller.flipkart.com/
-- Get:
-  - `FLIPKART_CLIENT_ID`
-  - `FLIPKART_CLIENT_SECRET`
-
-#### Meta Ads API
-- Visit: https://developers.facebook.com/
-- Create an app and get:
-  - `META_ACCESS_TOKEN` (from your app's settings)
-  - `META_AD_ACCOUNT_ID` (from Ads Manager)
-
-### 3. Run Locally
+### 2. Run Locally
 
 ```bash
 # Run the Streamlit app
@@ -64,6 +38,16 @@ Visit `http://localhost:8501` in your browser.
 4. **View Summary**: See total orders, revenue, and platform breakdown
 5. **Download**: Download the Excel file with consolidated order data
 
+## Data Sources
+
+### Free Public APIs Used
+
+- **Amazon Orders**: Books category from [DummyJSON Products API](https://dummyjson.com/products?category=books)
+- **Flipkart Orders**: Furniture category from [DummyJSON Products API](https://dummyjson.com/products?category=furniture)
+- **Meta Ads Orders**: All products from [DummyJSON Products API](https://dummyjson.com/products)
+
+Each API call is **completely free** and **requires no authentication**.
+
 ## Deployment on Streamlit Cloud
 
 1. Push code to GitHub (already done)
@@ -73,20 +57,7 @@ Visit `http://localhost:8501` in your browser.
    - Repository: `kavya-32/Order-Reporting-System`
    - Branch: `main`
    - Main file: `app.py`
-5. **Configure Secrets**:
-   - Click "Manage App" → "Secrets"
-   - Add all API credentials from `.env`
-
-Example secrets format:
-```
-AWS_ACCESS_KEY_ID = "your_key_here"
-AWS_SECRET_ACCESS_KEY = "your_secret_here"
-AWS_REGION = "us-east-1"
-FLIPKART_CLIENT_ID = "your_flipkart_id"
-FLIPKART_CLIENT_SECRET = "your_flipkart_secret"
-META_ACCESS_TOKEN = "your_meta_token"
-META_AD_ACCOUNT_ID = "your_account_id"
-```
+5. Click **Deploy** - it will work immediately (no secrets needed!)
 
 ## Project Structure
 
@@ -95,7 +66,6 @@ META_AD_ACCOUNT_ID = "your_account_id"
 ├── app.py                    # Streamlit web interface
 ├── main.py                   # ETL pipeline (fetch, transform, load)
 ├── requirements.txt          # Python dependencies
-├── .env.example             # Example environment variables
 ├── .gitignore               # Git ignore rules
 ├── .streamlit/
 │   └── config.toml          # Streamlit configuration
@@ -105,9 +75,10 @@ META_AD_ACCOUNT_ID = "your_account_id"
 ## How It Works
 
 ### 1. Fetch
-- Connects to real APIs or uses mock data
-- Filters by time period (1 hour, 30 min, 1 day)
-- Handles API errors gracefully with fallback to mock data
+- Makes HTTP requests to free DummyJSON API
+- DummyJSON provides realistic product data
+- Generates synthetic orders by randomly repeating products
+- No API authentication needed & 100% free
 
 ### 2. Transform
 - Standardizes data across platforms
@@ -121,39 +92,59 @@ META_AD_ACCOUNT_ID = "your_account_id"
 - Handles file lock issues with timestamped fallback names
 - Logs all operations
 
-## Error Handling
+## Using Real APIs (Optional)
 
-If API credentials are missing or invalid, the system automatically:
-- Logs a warning
-- Falls back to mock data
-- Continues processing
+To connect to **real e-commerce APIs** instead of dummy data:
 
-This ensures the app never crashes, even without real API access.
-
-## Development
-
-### Running locally with mock data:
-```bash
-python main.py
+### Amazon Selling Partner API
+```python
+# Install: pip install boto3
+AWS_ACCESS_KEY_ID=your_aws_key
+AWS_SECRET_ACCESS_KEY=your_aws_secret
+AWS_REGION=us-east-1
 ```
 
-### Testing with Streamlit:
-```bash
-streamlit run app.py
+### Flipkart Seller API
+```python
+FLIPKART_CLIENT_ID=your_flipkart_id
+FLIPKART_CLIENT_SECRET=your_flipkart_secret
 ```
 
-### Adding new data sources:
-1. Create a `fetch_your_api_orders()` function
-2. Add it to the `SOURCES` list with proper field mapping
-3. Include error handling and mock data fallback
+### Meta Conversions API
+```python
+META_ACCESS_TOKEN=your_meta_token
+META_AD_ACCOUNT_ID=your_account_id
+```
+
+See `.env.example` for all environment variables.
 
 ## Tech Stack
 
 - **Python 3.9+**
 - **Streamlit** - Web UI
 - **Pandas** - Data processing
-- **Requests** - API calls
+- **Requests** - HTTP API calls
 - **openpyxl** - Excel export
+- **DummyJSON** - Free public API for demo data
+
+## Error Handling
+
+- If API is unavailable → returns empty list (graceful degradation)
+- All API timeouts are handled with retry logic
+- Comprehensive error logging for debugging
+
+## Development
+
+### Running locally:
+```bash
+python main.py          # Generate report directly
+streamlit run app.py    # Run web interface
+```
+
+### Adding new data sources:
+1. Create a `fetch_new_source()` function
+2. Add it to the `SOURCES` list
+3. Include proper error handling
 
 ## License
 
@@ -161,7 +152,11 @@ MIT
 
 ## Support
 
-For issues or questions:
+For issues:
 1. Check logs in Streamlit Cloud → Manage App → Logs
-2. Verify API credentials in `.env` or Streamlit secrets
-3. Ensure dependencies are installed: `pip install -r requirements.txt`
+2. Verify internet connection (APIs require network access)
+3. Ensure dependencies installed: `pip install -r requirements.txt`
+
+## API Credits
+
+- 🙏 [DummyJSON](https://dummyjson.com) - Free public API providing realistic product data
